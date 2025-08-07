@@ -1,15 +1,24 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from KM import KellerMiksis
 
 
 
-def AppendArrays(arr1,val1,arr2,val2,arr3,val3):
+def AppendArrays(arr1,val1,arr2,val2,arr3,val3,arr4,val4,arr5,val5):
+    """   AppendArrays(arr[i],val[i]) for i in range(N) is used to append a value to an array
+    Parameters:
+        arrI: Array 'I' you wish to append to 
+        valI: Value 'I' you wish to add to 
+    """
     if(val1 == None):
         return
     arr1.append(val1)
     arr2.append(val2)
     arr3.append(val3)
+    arr4.append(val4)
+    arr5.append(val5)
     return
 
 plt.rcParams.update({
@@ -31,7 +40,16 @@ plt.rcParams.update({
 })
 
 def PlotSpecs(xlabel,ylabel):
-        fig, ax = plt.subplots(figsize=(3.5,2.5))
+    """ PlotSpecs(xlabel,ylabel) --> Creates figure and axes objects with set plot specification appropriate
+                                     for this level of plotting
+    Parameters:
+        xlabel: r-String of the latex definition of your x label
+        ylabel: r-String of the latex defintion of your y label
+    Return:
+        fig: Figure object
+        ax: Axes object
+    """
+    fig, ax = plt.subplots(figsize=(3,3))
         # Show ticks on all 4 sides
         ax.tick_params(
         axis='both',
@@ -46,25 +64,53 @@ def PlotSpecs(xlabel,ylabel):
         return fig,ax
 
 def JettingImpactPlot(tJetting,minVolumes,pressures,dX,Cl):
-        fig,ax = PlotSpecs(xlabel=r'$P (MPa)$',ylabel=r'$\Delta T_{jet}/ \Delta T_{Collapse}$')
-        tShockImpact=dX/Cl
-        dParamJet=(tJetting-tShockImpact)/(minVolumes-tShockImpact)
-        ax.plot(pressures,dParamJet,'-',color='black')
-        fig.savefig(f"JettingImpactPlot.png")
-        plt.close(fig)
+    """ JettingImpactPlot(tJetting,minVolumes,pressures,dX,Cl) --> Creates a plot of shock pressure ratios vs deltaTjetting/deltaTcollapse against
+                                                                   Basically plots shock pressure vs when the re-entrnant jet forms vs when the bubble collapses
+    Parameters:
+        tJetting: Array of times when re-entrant jet formed
+        minVolumes: Array of times when bubble collapsed (reached minimum volume)
+        pressures: Array of shock overpressures 
+        dX: Distance until proximal side of bubble (most upstream point)
+        Cl: Speed of sound in water
+    """
+    fig,ax = PlotSpecs(xlabel=r'$p_{s}/p_{0}$',ylabel=r'$\Delta T_{j}/ \Delta T_{c}$')
+    tShockImpact=dX/Cl
+    dParamJet=(tJetting-tShockImpact)/(minVolumes-tShockImpact)
+    ax.plot(pressures/1e5,dParamJet,color='black',linestyle=None,marker='o',markersize=3)
+    fig.savefig(f"JettingImpactPlot.png",bbox_inches='tight')
+    plt.close(fig)
 
 def ShockVolumePlot(minVolumes,pressures,R0,Cl):
-        fig,ax = PlotSpecs(xlabel=r'$P (MPa)$',ylabel=r'$T_{diffract}/T_{Collapse}$')
-        tShockDiffract=2*R0/Cl
-        dParamJet=tShockDiffract/minVolumes
-        ax.plot(pressures,dParamJet,'-',color='black')
-        fig.savefig(f"ShockVolumePlot.png")
-        plt.close(fig)
+    """ ShockVolumePlot(minVolumes,pressures,R0,Cl) --> Creates a plot of shock pressure ratios vs the time taken for the shock to diffract / minimum volume (collapse)
+    Parameters:
+        minVolumes: Array of times when bubble collapsed (reached minimum volume)
+        pressures: Array of shock overpressures
+        R0: Initial bubble radius
+        Cl: Speed of sound in water
+    """
+    fig,ax = PlotSpecs(xlabel=r'$p_{s}/p_{0}$',ylabel=r'$T_{d}/T_{c}$')
+    tShockDiffract=2*R0/Cl
+    dParamJet=tShockDiffract/minVolumes
+    ax.plot(pressures/1e5,dParamJet,color='black',linestyle=None,marker='o',markersize=3)
+    ax.axhline(y=0.05,linestyle='--',color='Black')
+    fig.tight_layout()
+    fig.savefig(f"ShockVolumePlot.png",bbox_inches='tight')
+    plt.close(fig)
 
-
+def maxJetVelocity(maxJetting,pressures,Cl):
+    """ maxJetVelocity(maxJetting,pressures,Cl) --> Creates a plot of shock pressures vs the maximum jet velocity
+    Parameters:
+        maxJetting: Maximum jet velocity
+        pressures: Array of shock overpressures
+        Cl: Speed of sound in water (potentially unused)
+    """
+    fig,ax = PlotSpecs(xlabel=r'$p_{s}/p_{0}$',ylabel=r'$u (m/s)$')
+    ax.plot(pressures/1e5,maxJetting,color='black',linestyle=None,marker='o',markersize=3)
+    fig.savefig(f"MaxJettingVelocity.png",bbox_inches='tight')
+    plt.close(fig)
 
 class simulationRun:
-    def __init__(self,filepath,pressure,tfinal,name,particle_speed):
+    def __init__(self,filepath,pressure,tfinal,particle_speed,name):
         #Initial Stuff
         self.filepath=filepath
         self.pressure=pressure
@@ -73,7 +119,8 @@ class simulationRun:
         self.R0=0.000338
         self.Cl=1462
         self.Rho_l=998
-        self.ParticleSpeed=particle_speed
+        self.P0=1e5
+        self.up=particle_speed
         # For Area and Sphericity splots
         self.AreaArr=np.loadtxt(os.path.join(filepath, "Area.txt"))
         self.VolumeArr=np.loadtxt(os.path.join(filepath, "Volume.txt"))
@@ -102,10 +149,10 @@ class simulationRun:
         self.PositionMatrix=np.loadtxt(os.path.join(filepath,"pressure/position0000.txt"))+0.022 # Starts measuring from 0.022
 
         #For Keller Miksis array
-        self.KellerMiksis=np.loadtxt(os.path.join(filepath,"KM.txt"))
-        self.KM_U=self.KellerMiksis[:,2]
-        self.KM_T=self.KellerMiksis[:,0]
-        self.KM_R=self.KellerMiksis[:,1]
+        self.KMT,self.RRU=KellerMiksis(float(self.pressure),self.R0)
+        self.KMUDO=self.RRU[:,1]
+        self.KMUUP=-1*self.KMUDO
+
             
         # Time Matrix
         self.tArray=np.linspace(0,tfinal,self.NumRuns)
@@ -138,11 +185,12 @@ class simulationRun:
         self.TrimPressureMatrix=np.zeros((self.NumRuns,len(self.PositionMatrix)))
         self.TrimVelocityMatrix=np.zeros((self.NumRuns,len(self.PositionMatrix)))
         self.TrimAlphaMatrix=np.zeros((self.NumRuns,len(self.PositionMatrix)))
+
+        self.tRayleigh=0.915*self.R0*np.sqrt(self.Rho_l/(float(self.pressure)-self.P0))
         
         # Values
         self.y0=0.025
         self.tJetting=0
-
     
     '''
     Interface, look at interface, if there are no points w/volume fraction above 0.5 it means there is no interface along centerline
@@ -154,7 +202,7 @@ class simulationRun:
     def Interface(self):
         for i in range(self.NumRuns):
             Iarr=np.where(self.AlphaMatrix[:,i]>0.9)
-            if(len(Iarr[0])==1):
+            if(len(Iarr[0]) < 2):
                 self.tJetting=self.tArray[i] 
                 print(f'Jetting Achieved @ {self.tArray[i]}')
                 break
@@ -174,13 +222,6 @@ class simulationRun:
                 self.pInterfaceUpstream[i]=self.PressureMatrix[:,i][I]
                 self.aInterfaceUpstream[i]=self.AlphaMatrix[:,i][I]
     '''
-    Returns collapse index based on the point where the differnce in upstream and downstream velocities begins to change to a certain degree
-    '''
-    def CollapseStartTime(self):
-        diffUpstream=np.diff(self.TrimuInterfaceUpstream.flatten())
-        UpstreamCollapse=np.min(np.where(diffUpstream > 0.1))
-        return UpstreamCollapse
-    '''
     Trimming arryas based upon length of velocity interface where nothing is being output
     '''
     def TrimArrays(self):
@@ -195,26 +236,25 @@ class simulationRun:
         self.TrimVelocityMatrix=self.VelocityMatrix[:,:len(self.TrimuInterfaceDownstream)]
         self.TrimAlphaMatrix=self.AlphaMatrix[:,:len(self.TrimuInterfaceDownstream)]
 
-    def BokmanPressure(self):
-        PjetMPa=(self.Rho_l*(0.915*0.05*self.Cl*0.5)**2 + 1e5)/1e6
-        print(f'Bokman jetting pressure has to be greater than {PjetMPa} MPa')
-
-
+    '''
+    Returns collapse index based on the point where the differnce in upstream and downstream velocities begins to change to a certain degree
+    '''
+    def CollapseStartTime(self):
+        diffUpstream=np.diff(self.TrimuInterfaceUpstream.flatten())
+        UpstreamCollapse=np.min(np.where(diffUpstream > 0.1))
+        return UpstreamCollapse
+    
+    def VectorDiff(self,vec,diff=1e-5):
+        VecDiff=np.abs(np.diff(vec))
+        CollapseIdx=np.min(np.where(VecDiff > diff))
+        return CollapseIdx
+    
 
     def MinVolumeTime(self):
         MinVolumeIdx=np.argmin(self.VolumeArr[:,1])
-        print(MinVolumeIdx)
         tMinVolume=self.tArray[MinVolumeIdx]
-        print(tMinVolume)
         return tMinVolume
 
-    def BokmanCollapse(self):
-        tCollapse=self.MinVolumeTime()
-        tShockDiffract=2*self.R0/self.Cl
-        if(tShockDiffract/tCollapse > 0.05):
-            print(f"Bokman predicts collapse for {self.pressure}")
-        else:
-            print(f"Bokman et al. do not predict collapse for {self.pressure}")
 
     def PlotSpecs(self,xlabel,ylabel):
         fig, ax = plt.subplots(figsize=(3.5,2.5))
@@ -231,19 +271,18 @@ class simulationRun:
         ax.set_ylabel(ylabel)
 
         return fig, ax
+
     def VelocityPlot(self):
-        fig,ax = self.PlotSpecs(xlabel=r'$t/(R_{0}/C_{l})$',ylabel=r'$u$')
+        fig,ax = self.PlotSpecs(xlabel=r'$t/t_{\tau}$',ylabel=r'$u$')
         tCollapse=self.TrimtArray[self.CollapseStartTime()]
-        ax.plot((self.TrimtArray-tCollapse)/(self.R0/self.Cl),-1*self.TrimuInterfaceDownstream,'--',color='black',label='Downstream')
-        ax.plot((self.TrimtArray-tCollapse)/(self.R0/self.Cl),self.TrimuInterfaceUpstream,'-',color='black',label='Upstream')
-        ax.plot(self.KM_T/(self.R0/self.Cl),-1*self.KM_U,linestyle='dashdot',color='black')
-        ax.plot(self.KM_T/(self.R0/self.Cl),self.KM_U,linestyle='dashdot',color='black',label='Keller Miksis')
-        ax.legend()
-        if(self.tJetting!=0):
-            ax.set_xlim(0,(self.tJetting-tCollapse)/(self.R0/self.Cl))
-        else:
-            ax.set_xlim(0,None) 
-        fig.savefig(os.path.join(self.filepath, f"VelocityPlot_{self.name}.png"))
+        ax.plot((self.TrimtArray-tCollapse)/self.tRayleigh, self.TrimuInterfaceDownstream,'--',color='black',label='Downstream')
+        ax.plot((self.TrimtArray-tCollapse)/self.tRayleigh,self.TrimuInterfaceUpstream,'-',color='black',label='Upstream')
+        ax.plot(self.KMT/self.tRayleigh,self.KMUUP,linestyle='dashdot',color='black')
+        ax.plot(self.KMT/self.tRayleigh,self.KMUDO,linestyle='dashdot',color='black',label='Keller-Miksis')
+        ax.set_xlim(0,1.05)
+        fig.tight_layout()
+        plt.show()
+        fig.savefig(os.path.join(self.filepath, f"VelocityPlot_{self.name}.png"),bbox_inches='tight')
         plt.close(fig)
     def PositionPlot(self):
         fig,ax = self.PlotSpecs(xlabel=r'$t/\tau_{c}$',ylabel=r'$\frac{(y-y_{0})}{R_{0}}$')
@@ -253,11 +292,14 @@ class simulationRun:
         fig.savefig(os.path.join(self.filepath, f"PositionPlot_{self.name}.png"))
         plt.close(fig)
     def VelocityContour(self):
-        fig,ax = self.PlotSpecs(xlabel=r'$\frac{(y-y_{0})}{R_{0}}$',ylabel=r'$t/\tau_{c}$')
-        ax.contourf(self.TrimtArray/(self.R0/self.Cl),(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimVelocityMatrix/(self.Cl**2),cmap='Greys')
-        ax.plot(self.TrimtArray/(self.R0/self.Cl),(self.TrimyInterfaceDownstream-self.y0)/self.R0,'--',color='black')
-        ax.plot(self.TrimtArray/(self.R0/self.Cl),(self.TrimyInterfaceUpstream-self.y0)/self.R0,'-',color='black')
-        fig.savefig(os.path.join(self.filepath, f"VelocityContour_{self.name}.png"))
+        fig,ax = self.PlotSpecs(xlabel=r'$t/t_{\tau}$',ylabel=r'$\frac{(y-y_{0})}{R_{0}}$')
+        tCollapse=self.TrimtArray[self.CollapseStartTime()]
+        ax.contourf((self.TrimtArray-tCollapse)/self.tRayleigh,(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimVelocityMatrix/(self.Cl**2),cmap='Greys')
+        ax.plot((self.TrimtArray-tCollapse)/self.tRayleigh,(self.TrimyInterfaceDownstream-self.y0)/self.R0,'--',color='black')
+        ax.plot((self.TrimtArray-tCollapse)/self.tRayleigh,(self.TrimyInterfaceUpstream-self.y0)/self.R0,'-',color='black')
+        ax.set_xlim(0,None)
+        fig.tight_layout()
+        fig.savefig(os.path.join(self.filepath, f"VelocityContour_{self.name}.png"),bbox_inches='tight')
         plt.close(fig)
     def PressureContour(self):
         fig,ax = self.PlotSpecs(xlabel=r'$\frac{(y-y_{0})}{R_{0}}$',ylabel=r'$t/\tau_{c}$')
@@ -267,11 +309,15 @@ class simulationRun:
         fig.savefig(os.path.join(self.filepath, f"PressureContour_{self.name}.png"))
         plt.close(fig)
     def VolumePlot(self):
-        fig,ax = self.PlotSpecs(xlabel=r'$t/\tau_{c}$',ylabel=r'$V/V_{0}$')
-        ax.plot(self.VolumeArr[:,0]/(self.R0/self.Cl),self.VolumeArr[:,1]/self.VolumeArr[0,1],'-',color='black')
+        fig,ax = self.PlotSpecs(xlabel=r'$t/t_{\tau}$',ylabel=r'$V_{B}/V_{0}$')
+        vB=self.VolumeArr[:,1]/self.VolumeArr[0,1]
+        tShift=self.VolumeArr[:,0][self.VectorDiff(vB,1e-6)]
+        ax.plot((self.VolumeArr[:,0]-tShift)/self.tRayleigh,vB,'-',color='black')
         if(self.tJetting != 0):
-            ax.axvline(x=self.tJetting/(self.R0/self.Cl),linestyle='--',color='black')
-        fig.savefig(os.path.join(self.filepath, f"VolumePlot_{self.name}.png"))
+            ax.axvline(x=(self.tJetting-tShift)/self.tRayleigh,linestyle='--',color='black')
+        fig.tight_layout()
+        ax.set_xlim(0,None)
+        fig.savefig(os.path.join(self.filepath, f"VolumePlot_{self.name}.png"),bbox_inches='tight')
         plt.close(fig)
     def SphericityPlot(self):
         fig,ax = self.PlotSpecs(xlabel=r'$t/\tau_{c}$',ylabel=r'$Sphericity$')
@@ -280,48 +326,65 @@ class simulationRun:
         plt.close(fig)
     def JettingParameters(self):
         if(self.tJetting==0):
-            return None,None
+            return None,None,None,None
         MinVolumeTime=self.MinVolumeTime()
-        return self.tJetting, MinVolumeTime
+        JettingVolume=np.max(self.uInterfaceUpstream)
+        tMove=self.TrimtArray[self.CollapseStartTime()]
+        return self.tJetting, MinVolumeTime,JettingVolume,tMove
 
 
 
     def Run(self):
         self.Interface()
         self.TrimArrays()
-        self.BokmanCollapse()
-        self.BokmanPressure()
+
         print('Plotting Volume')
         self.VolumePlot()
-        print('Plotting Sphericity')
-        self.SphericityPlot()
+
         print('Plotting Interface Velocity')
         self.VelocityPlot()
-        print('Plotting Interface Position')
-        self.PositionPlot()
+
+        #print('Plotting Interface Position')
+        #self.PositionPlot()
+
         print('Plotting Velocity Contour')
         self.VelocityContour()
-        print('Plotting Pressure Contour')
-        self.PressureContour()
-        tJ,mV=self.JettingParameters()
-        return tJ,mV
+
+        #print('Plotting Pressure Contour')
+        #self.PressureContour()
+
+        tJ,mV,jV,tM=self.JettingParameters()
+        return tJ,mV,jV,tM
+
 jettingTimes=[]*4
 minVolumes=[]*4
+maxJetting=[]*4
+tMove=[]*4
 pressures=[]*4
-WS100e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_100e6_Euler','100e6',5e-6,'WS100e6',65.4931)
-tJ,mV=WS100e6.Run()
-AppendArrays(jettingTimes,tJ,minVolumes,mV,pressures,100e6)
-WS10e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_10e6_Euler','10e6',8e-6,'WS10e6',6.7532)
-tJ,mV=WS10e6.Run()
-AppendArrays(jettingTimes,tJ,minVolumes,mV,pressures,10e6)
-WS1e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_1e6_Euler','1e6',2e-5,'WS1e6',0.6165)
-tJ,mV=WS1e6.Run()
-AppendArrays(jettingTimes,tJ,minVolumes,mV,pressures,1e6)
-WS500e5=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_500e5_Euler','500e5',5e-5,'WS500e5',0.2741)
-tJ,mv=WS500e5.Run()
-AppendArrays(jettingTimes,tJ,minVolumes,mV,pressures,500e5)
+
+WS100e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_100e6_Euler','100e6',5e-6,65.4931,'WS100e6')
+tJ,mV,jV,tM=WS100e6.Run()
+AppendArrays(jettingTimes,tJ,minVolumes,mV,maxJetting,jV,pressures,100e6,tMove,tM)
+
+WS10e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_10e6_Euler','10e6',8e-6,6.7532,'WS10e6')
+tJ,mV,jV,tM=WS10e6.Run()
+AppendArrays(jettingTimes,tJ,minVolumes,mV,maxJetting,jV,pressures,10e6,tMove,tM)
+
+WS1e6=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_1e6_Euler','1e6',2e-5,0.616480,'WS1e6')
+tJ,mV,jV,tM=WS1e6.Run()
+AppendArrays(jettingTimes,tJ,minVolumes,mV,maxJetting,jV,pressures,1e6,tMove,tM)
+
+WS500e5=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/WS_500e5_Euler','0.5e6',5e-5,0.274504,'WS500e5')
+tJ,mv,jV,tM=WS500e5.Run()
+AppendArrays(jettingTimes,tJ,minVolumes,mV,maxJetting,jV,pressures,500e5,tMove,tM)
+
+
 jettingTimes=np.array(jettingTimes)
 minVolumes=np.array(minVolumes)
 pressures=np.array(pressures)
+maxJetting=np.array(maxJetting)
+tMove=np.array(tMove)
+
 JettingImpactPlot(jettingTimes,minVolumes,pressures,0.004662,1462)
 ShockVolumePlot(minVolumes,pressures,0.000338,1462)
+maxJetVelocity(maxJetting,pressures,1462)
