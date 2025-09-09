@@ -1,9 +1,13 @@
-import numpy as np
+import numpy as np 
 import os
 import matplotlib.pyplot as plt
 
+'''
+    @brief Set plotting parameters
+'''
+plt.rc('text',usetex=True)
 plt.rcParams.update({
-    'font.size': 9,
+    'font.size': 14,
     'font.family': 'serif',
     'axes.labelsize': 9,
     'axes.titlesize': 9,
@@ -20,10 +24,21 @@ plt.rcParams.update({
     'savefig.dpi': 600
 })
 
+blue = "#0072B2"   # Okabe-Ito blue
+orange = "#E69F00" # Okabe-Ito orange
+black = "#000000"
 
+## Global Parameters ##
+filepath='/home/exy214/Documents/cavitation/data/jetting_ws_2025/'
 
-def PlotSpecs(xlabel,ylabel):
-        fig, ax = plt.subplots(figsize=(3.5,2.5))
+'''
+    @brief Define figure and axes objects
+    @param xlabel String of xlabel
+    @param ylabel String of y label
+    @return Returns a figure and axes object
+'''
+def PlotSpecs(xlabel,ylabel) :
+        fig, ax = plt.subplots(figsize=(4,3))
         # Show ticks on all 4 sides
         ax.tick_params(
         axis='both',
@@ -38,24 +53,106 @@ def PlotSpecs(xlabel,ylabel):
 
         return fig, ax
 
-def ValidationPlot(dict1,dict2,X0,R0,Cl,tCollapse=4e-6):
-    fig,ax=PlotSpecs(xlabel=r'$t/(R_{0}/C_{l})$',ylabel=None)
-    V0=(4.0/3.0)*np.pi*R0**3
-    Cl=1642
+'''
+    @brief Validation plot for each bubble resolution
+    @param dict1 Dictinonary containing arrays for a bubble resolution
+    @param dict2 See dict1
+    @param X0 Initial location of bubble centroid
+    @param R0 Initial bubble radius
+    @param Cl Speed of sound within liquid
+    @param tShift Time at which shock reaches bubble proximal side
+'''
+def ValidationPlot(dict1,dict2,X0,R0,Cl,tShift,Comparison):
+    fig,ax=PlotSpecs(xlabel=r'$t/(R_{0}/c_{L})$',ylabel=None)
+    Cl=1687
     
-    ax.plot((dict1["Volume"][:,0]-tCollapse)/(R0/Cl),dict1["Volume"][:,1]/V0,'-',marker='o',markevery=8,markersize=2,color='black',label=dict1["Name"])
-    ax.plot((dict2["Volume"][:,0]-tCollapse)/(R0/Cl),dict2["Volume"][:,1]/V0,'-',marker='^',markevery=8,markersize=2,color='black',label=dict2["Name"])
+    ax.plot((dict1["Volume"][:,0]-tShift)/(R0/Cl),dict1["Volume"][:,1]/dict1["Volume"][0,1],'-',marker='o',markevery=4,markersize=2,color='black',label=dict1["Name"])
+    ax.plot((dict2["Volume"][:,0]-tShift)/(R0/Cl),dict2["Volume"][:,1]/dict2["Volume"][0,1],'-',marker='^',markevery=4,markersize=2,color='blue',label=dict2["Name"])
 
-    ax.plot((dict1["Centroid"][:,0]-tCollapse)/(R0/Cl),-1*(dict1["Centroid"][:,1]-X0)/R0,linestyle='--',marker='o',markevery=8,markersize=2,color='black',label=dict1["Name"])
-    ax.plot((dict2["Centroid"][:,0]-tCollapse)/(R0/Cl),-1*(dict2["Centroid"][:,1]-X0)/R0,linestyle='--',marker='^',markevery=8,markersize=2,color='black',label=dict2["Name"])
-
-
-    ax.plot((dict1["NS"][:,0]-tCollapse)/(R0/Cl),dict1["NS"][:,1],linestyle='dashdot',marker='o',markevery=8,markersize=2,color='black',label=dict1["Name"])
-    ax.plot((dict2["NS"][:,0]-tCollapse)/(R0/Cl),dict2["NS"][:,1],linestyle='dashdot',marker='^',markevery=8,markersize=2,color='black',label=dict2["Name"])
+    ax.plot((dict1["Centroid"][:,0]-tShift)/(R0/Cl),-1*(dict1["Centroid"][:,1]-X0)/R0,linestyle='--',marker='o',markevery=4,markersize=2,color='black')
+    ax.plot((dict2["Centroid"][:,0]-tShift)/(R0/Cl),-1*(dict2["Centroid"][:,1]-X0)/R0,linestyle='--',marker='^',markevery=4,markersize=2,color='blue')
 
 
-    ax.set_xlim(0,None)
-    fig.savefig(os.path.join("res_param_validation.png"),bbox_inches='tight')
+    #ax.plot((dict1["NS"][:,0]-tShift)/(R0/Cl),dict1["NS"][:,1],linestyle='dashdot',marker='o',markevery=4,markersize=2,color='black',label=dict1["Name"])
+    #ax.plot((dict2["NS"][:,0]-tShift)/(R0/Cl),dict2["NS"][:,1],linestyle='dashdot',marker='^',markevery=4,markersize=2,color='black',label=dict2["Name"])
+    
+    ax.set_xlim(0,10)
+    ax.set_ylim(-0.6,1.05)
+
+    if Comparison=='Colonius': 
+
+        ValidationVolume=np.loadtxt(f"{filepath}Colonius-Data/Volume.txt")
+        ValidationNonSphericity=np.loadtxt(f"{filepath}Colonius-Data/NonSphericity.txt",delimiter=',')
+        ValidationCentroid=np.loadtxt(f"{filepath}Colonius-Data/Centroid.txt",delimiter=',')
+
+        ax.plot(ValidationVolume[:,0],ValidationVolume[:,1],'-',marker='*',markevery=4,markersize=2,color='orange',label="Johnsen \\& Colonius (2009)")
+        ax.plot(ValidationCentroid[:,0],ValidationCentroid[:,1],linestyle='--',marker='*',markevery=4,markersize=2,color='orange')
+        #ax.plot(ValidationNonSphericity[:,0],ValidationNonSphericity[:,1],linestyle='dashdot',marker='*',markevery=4,markersize=2,color='orange',label="Johnsen & Colonius (2009)")
+        print('Printing Colonius Parameter Validation')
+        ax.text(0.025,0.95, '(a)', transform=ax.transAxes, fontsize=14, va='top', ha='left')
+        ax.legend(loc='upper right')
+        fig.savefig(os.path.join("paper-images/ParameterValidationColonius.png"))
+
+    elif Comparison =='FronTier':
+        
+        ValidationVolume=np.loadtxt(f"{filepath}FronTier-Data/Volume.txt")
+        #ValidationNonSphericity=np.loadtxt(f"{filepath}FronTier-Data/NonSphericity.txt",delimiter=',')
+        ValidationCentroid=np.loadtxt(f"{filepath}FronTier-Data/Centroid.txt")
+
+
+        ax.plot((ValidationVolume[:,0]-tShift)/(R0/Cl),ValidationVolume[:,1]/ValidationVolume[0,1],'-',marker='*',markevery=4,markersize=2,color='orange',label="Bempedelis \\& Ventikos (2021)")
+        ax.plot((ValidationCentroid[:,0]-tShift)/(R0/Cl),-1*(ValidationCentroid[:,1]-X0)/R0,linestyle='--',marker='*',markevery=4,markersize=2,color='orange')
+        #ax.plot(ValidationNonSphericity[:,0],ValidationNonSphericity[:,1],linestyle='dashdot',marker='*',markevery=4,markersize=2,color='blue',label="Johnsen")
+        print('Printing FronTier Parameter Validation')
+        ax.text(0.025,0.95, '(a)', transform=ax.transAxes, fontsize=14, va='top', ha='left')
+        ax.legend(loc='upper right')
+        fig.savefig(os.path.join("paper-images/ParameterValidationFronTier.png"))
+    else:
+        print(f'There is no data available using the {Comparison} simulation')
+
+
+def VelocityValidationPlot(dict1,dict2,R0,Cl,tSimShift,tJohnsen,Comparison):
+    fig,ax=PlotSpecs(xlabel=r'$t/(R_{0}/c_{L})$',ylabel=r'$u/c_{L}$')
+       
+    ax.plot((dict1["Time"]-tSimShift)/(R0/Cl),dict1["UUP"]/Cl,linestyle='-',marker='o',markevery=4,markersize=2,color='black',label=dict1["Name"])
+    ax.plot((dict1["Time"]-tSimShift)/(R0/Cl),dict1["UDO"]/Cl,linestyle='--',marker='o',markevery=4,markersize=2,color='black')
+    
+    ax.plot((dict2["Time"]-tSimShift)/(R0/Cl),dict2["UUP"]/Cl,linestyle='-',marker='^',markevery=4,markersize=2,color='blue',label=dict2["Name"])
+    ax.plot((dict2["Time"]-tSimShift)/(R0/Cl),dict2["UDO"]/Cl,linestyle='--',marker='^',markevery=4,markersize=2,color='blue')
+
+    ax.set_xlim(0,10)
+    ax.set_ylim(-0.7,1.05)
+
+    if Comparison == 'Colonius':
+    
+        JUUP=np.loadtxt(f"{filepath}Colonius-Data/VelocityUpstream.txt",delimiter=',')
+        JUDO=np.loadtxt(f"{filepath}Colonius-Data/VelocityDownstream.txt",delimiter=',')
+
+        ax.plot(JUUP[:,0]-tJohnsen,-1*JUUP[:,1],linestyle='-',marker='*',markevery=4,markersize=2,color='orange',label="Johnsen \\& Colonius (2009)")
+        ax.plot(JUDO[:,0]-tJohnsen,-1*JUDO[:,1],linestyle='--',marker='*',markevery=4,markersize=2,color='orange')
+
+        print('Printing Colonius Velocity Validation')
+        ax.text(0.025,0.95, '(b)', transform=ax.transAxes, fontsize=14, va='top', ha='left')
+        ax.legend(loc='upper right')
+        fig.savefig(os.path.join("paper-images/VelocityValidationColonius.png"))
+    
+    if Comparison == 'FronTier':
+        
+        FP=np.loadtxt(f"{filepath}FronTier-Data/Velocity.txt")
+        FT=FP[:,0]
+        UP=FP[:,1]
+        DP=FP[:,2]
+
+        FUUP=np.gradient(UP,FT)
+        FUDO=np.gradient(DP,FT)
+
+        ax.plot((FT-tSimShift)/(R0/Cl),FUUP/Cl,linestyle='-',marker='o',markevery=4,markersize=2,color='orange',label='Bempedelis \\& Ventikos (2021)')
+        ax.plot((FT-tSimShift)/(R0/Cl),FUDO/Cl,linestyle='-',marker='o',markevery=4,markersize=2,color='orange')
+       
+        print('Printing FronTier Velocity Validation')
+        ax.text(0.025,0.95, '(b)', transform=ax.transAxes, fontsize=14, va='top', ha='left')
+        ax.legend(loc='upper right')
+        fig.savefig(os.path.join("paper-images/VelocityValidationFronTier.png"))
 
 
 class simulationRun:
@@ -84,13 +181,12 @@ class simulationRun:
         self.NSArr=np.empty_like(self.AreaArr)
         self.NSArr[:,0]=self.AreaArr[:,0]
         self.NSArr[:,1]=self.AreaArr[:,1]/(self.RadiusArr[:,1]*self.PerimeterArr[:,1])
-        
        
         #Validation Plot Info
         self.X0=0.5*16e-3
         self.R0=5e-4
         self.Cl=1646.66
-        self.tShiftBottom=3e-6
+        self.tShiftBottom=5e-6
         self.V0 = (4/3)*np.pi*self.R0**3
         
         #For Velocity Matrix
@@ -107,15 +203,9 @@ class simulationRun:
         self.AlphaMatrix=np.stack(self.AlphaList,axis=1)
 
         #For Position Matrix
-        self.PositionMatrix=np.loadtxt(os.path.join(filepath,"velocity/position0000.txt"))
+        self.PositionMatrix=np.loadtxt(os.path.join(filepath,"velocity/position0000.txt"))+4e-3
     
-        self.ValidationVolume=np.loadtxt("/home/exy214/Documents/cavitation/data/jetting_ws_2025/Colonius-Data/Volume.txt",delimiter=',')
-        self.ValidationNonSphericity=np.loadtxt("/home/exy214/Documents/cavitation/data/jetting_ws_2025/Colonius-Data/NonSphericity.txt",delimiter=',')
-        self.ValidationCentroid=np.loadtxt("/home/exy214/Documents/cavitation/data/jetting_ws_2025/Colonius-Data/Centroid.txt",delimiter=',')
-        self.VelocityUpstream=np.loadtxt("/home/exy214/Documents/cavitation/data/jetting_ws_2025/Colonius-Data/VelocityUpstream.txt",delimiter=',')
-        self.VelocityDownstream=np.loadtxt("/home/exy214/Documents/cavitation/data/jetting_ws_2025/Colonius-Data/VelocityDownstream.txt",delimiter=',')
         # Time Matrix
-     
         self.tArray=np.linspace(0,tfinal,self.NumRuns)
 
         # Interface Values
@@ -156,10 +246,8 @@ class simulationRun:
 
     def Interface(self):
         for i in range(self.NumRuns):
-            Iarr=np.where(self.AlphaMatrix[:,i]>0.9)
-            if(len(Iarr[0])==1):
-                self.tJetting=self.tArray[i] 
-                print(f'Jetting Achieved @ {self.tArray[i]}')
+            Iarr=np.where(self.AlphaMatrix[:,i]>0.5)
+            if(len(Iarr[0]) < 2):
                 break
             else:
                 YGasPosition=self.PositionMatrix[Iarr]
@@ -171,15 +259,13 @@ class simulationRun:
                 I=int(np.where(self.PositionMatrix==YMin)[0][0])
                 self.uInterfaceUpstream[i]=self.VelocityMatrix[:,i][I]
 
-    '''
-    Returns collapse index based on the point where the differnce in upstream and downstream velocities begins to change to a certain degree
-    '''
-
-    def CollapseTime(self):
-        diffUpstream=np.diff(self.TrimuInterfaceUpstream.flatten())
-        UpstreamCollapse=np.min(np.where(diffUpstream > 0.1))
-        return UpstreamCollapse
-
+    def JetTime(self):
+        for i in range(self.NumRuns):
+            Iarr=np.where(self.AlphaMatrix[:,i]>0.5)
+            if(len(Iarr[0]) < 1):
+                self.tJetting=self.tArray[i] 
+                print(f'Jetting Achieved @ {self.tArray[i]}')
+                break
     '''
     Trimming arryas based upon length of velocity interface where nothing is being output
     '''
@@ -190,113 +276,50 @@ class simulationRun:
         self.TrimtArray=self.tArray[0:len(self.TrimuInterfaceDownstream)]
         self.TrimVelocityMatrix=self.VelocityMatrix[:,:len(self.TrimuInterfaceDownstream)]
         self.TrimAlphaMatrix=self.AlphaMatrix[:,:len(self.TrimuInterfaceDownstream)]
-
-    def PlotSpecs(self,xlabel,ylabel):
-        fig, ax = plt.subplots(figsize=(3.5,2.5))
-        # Show ticks on all 4 sides
-        ax.tick_params(
-        axis='both',
-        which='both',
-        direction='in',
-        top=True,
-        right=True
-        )
-        # --- Labels and Limits ---
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-
-        return fig, ax
-
-    '''
-    def VelocityPlot(self):
-        fig,ax = self.PlotSpecs(xlabel=r'$t/(R_{0}/C_{l})$',ylabel=r'$u$')
-        #tCollapse=self.TrimtArray[self.CollapseTime()]
-        #ax.plot((self.TrimtArray-tCollapse)/(self.R0/self.Cl),self.TrimuInterfaceDownstream,'--',color='black',label='Downstream')
-        #ax.plot((self.TrimtArray-tCollapse)/(self.R0/self.Cl),self.TrimuInterfaceUpstream,'-',color='black',label='Upstream')
-        #ax.plot(self.KM_T/(self.R0/self.Cl),-1*self.KM_U,linestyle='dashdot',color='black',label='Keller Miksis')
-        #ax.plot(self.KM_T/(self.R0/self.Cl),self.KM_U,linestyle='dashdot',color='black',label='Keller Miksis')
-        #ax.legend()
-        if(self.tJetting!=0):
-            #ax.set_xlim(0,(self.tJetting-tCollapse)/(self.R0/self.Cl))
-            print('.')
-        else:
-            #ax.set_xlim(0,None) 
-            print('.')
-        plt.show()
-        #fig.savefig(os.path.join(self.filepath, f"VelocityPlot_{self.name}.png"))
-        plt.close(fig)
-    '''
-
-    def ValidationPlot(self):
-        fig,ax=self.PlotSpecs(xlabel=r'$t/(R_{0}/C_{l})$',ylabel=None)
-        ax.plot(self.ValidationVolume[:,0],self.ValidationVolume[:,1],'-',color='black')
-        ax.plot((self.VolumeArr[:,0]-self.tShiftBottom)/(self.R0/self.Cl),self.VolumeArr[:,1]/self.V0,marker='o',markevery=8,markersize=3,color='black')
-
-        ax.plot(self.ValidationCentroid[:,0],self.ValidationCentroid[:,1],'--',color='black')
-        ax.plot((self.CentroidArr[:,0]-self.tShiftBottom)/(self.R0/self.Cl),-1*((self.CentroidArr[:,1]-self.X0)/self.R0),marker='o',markevery=8,markersize=3,color='black')
-        
-
-        ax.plot(self.ValidationNonSphericity[:,0],self.ValidationNonSphericity[:,1],linestyle='dashdot',color='black')
-        #ax.plot((self.NSArr[:,0]-self.tShiftBottom)/(self.R0/self.Cl),self.NSArr[:,1],marker='o',markevery=8,markersize=3,color='black')
-
-        ax.set_xlim(0,10)
-        fig.tight_layout()
-        fig.savefig(os.path.join("sim_param_validation.png"),bbox_inches='tight')
-
-
-    def VelocityValidationPlot(self):
-        fig,ax=self.PlotSpecs(xlabel=r'$t/(R_{0}/C_{l})$',ylabel=r'$u/c_{L}$')
-        
-        ax.plot((self.VelocityUpstream[:,0]),self.VelocityUpstream[:,1],linestyle='-',color='black')
-        ax.plot((self.VelocityDownstream[:,0]),self.VelocityDownstream[:,1],linestyle='--',color='black')
-
-        ax.plot((self.TrimtArray-self.tShiftBottom)/(self.R0/self.Cl),-1*self.TrimuInterfaceUpstream/self.Cl,linestyle='None',marker='o',markevery=8,markersize=3,color='black')
-        ax.plot((self.TrimtArray-self.tShiftBottom)/(self.R0/self.Cl),-1*self.TrimuInterfaceDownstream/self.Cl,linestyle='None',marker='o',markevery=8,markersize=3,color='black')
-
-        fig.savefig(os.path.join("sim_velocity_validation.png"),bbox_inches='tight')
    
     def Run(self):
         self.Interface()
         self.TrimArrays()
-        #print('Plotting Interface Velocity')
-        #self.VelocityPlot()
-        #self.ValidationPlot()
-        self.VelocityValidationPlot() 
+        self.JetTime()
+        return self.tJetting
 
-ColoniusLL=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/ColoniusLL','35.3e6',8e-6,'ColoniusLL')
-ColoniusLL.Run()
-#ColoniusL=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/ColoniusL','35.3e6',8e-6,'ColoniusL')
-#ColoniusL.Run()
-#ColoniusM=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/ColoniusM','35.3e6',8e-6,'ColoniusM')
-#ColoniusM.Run()
+ColoniusL=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/ColoniusL','35.3e6',8e-6,'ColoniusL')
+ColoniusL.Run()
+ColoniusM=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/ColoniusM','35.3e6',8e-6,'ColoniusM')
+tJet=ColoniusM.Run()
+
 
 ## Plotting betweeen simulations
-X0 = 0.5*16e-3
+x0=0.0075
+X0=0.5*16e-3
 R0 = 5e-4
-Cl = 1642
+Cl = 1687
 
-ColoniusLLDict={
-        "Volume": ColoniusLL.VolumeArr,
-        "Centroid": ColoniusLL.CentroidArr,
-        "NS": ColoniusLL.NSArr,
-        "Name": "ColoniusLL"
-        }
-'''
+
 ## Dictionaries 
 ColoniusLDict={
         "Volume": ColoniusL.VolumeArr,
         "Centroid": ColoniusL.CentroidArr,
         "NS": ColoniusL.NSArr,
-        "Name": "ColoniusL"
+        "UUP":ColoniusL.TrimuInterfaceUpstream,
+        "UDO":ColoniusL.TrimuInterfaceDownstream,
+        "Time": ColoniusL.TrimtArray,
+        "Name": "128 ppbr"
         }
 
 ColoniusMDict={
         "Volume": ColoniusM.VolumeArr,
         "Centroid": ColoniusM.CentroidArr,
         "NS": ColoniusM.NSArr,
-        "Name": "ColoniusM"
+        "UUP":ColoniusM.TrimuInterfaceUpstream,
+        "UDO":ColoniusM.TrimuInterfaceDownstream,
+        "Time":ColoniusM.TrimtArray,
+        "Name": "256 ppbr"
         }
 
+tShock=x0/Cl
+print(tShock)
+tCollapseJohnsen=1.4
 
-ValidationPlot(ColoniusLDict,ColoniusMDict,X0,R0,Cl)
-'''
+ValidationPlot(ColoniusLDict,ColoniusMDict,X0,R0,Cl,tShock,'FronTier')
+VelocityValidationPlot(ColoniusLDict,ColoniusMDict,R0,Cl,tShock,tCollapseJohnsen,'FronTier')
