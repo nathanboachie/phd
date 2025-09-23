@@ -2,8 +2,7 @@ import os
 import numpy as np
 from visit import *
 
-domain_folders=['PostProc']
-
+domain_folders=['ColoniusL','ColoniusM','Shock0P5','Shock0P7','Shock0P9','Shock100P0','Shock10P0','Shock2P0','shock4P0','Shock8P0']
 
 
 ## Immutables ##
@@ -22,69 +21,53 @@ def Clean():
   DeleteAllPlots()
   ClearAllWindows()
 
-for domain_folder in domain_folders:
-  DeleteAllPlots()
-  
-  folderPath=f'/home/exy214/Documents/cavitation/data/jetting_ws_2025/runs/{domain_folder}/domain/'
-  alphawritePath=f'{folderPath}{alphaFolder}'
-  velocitywritePath=f'{folderPath}{velocityFolder}'
-  interfacewritePath=f'{folderPath}{interfaceFolder}'
-  pressurewritePath=f'{folderPath}{pressureFolder}'
-  volumefracwritePath=f'{folderPath}{volumefracFolder}'
 
-  os.makedirs(interfacewritePath,exist_ok=True)
-  os.makedirs(pressurewritePath,exist_ok=True)
-  os.makedirs(alphawritePath,exist_ok=True)
-  os.makedirs(velocitywritePath,exist_ok=True)
-  os.makedirs(volumefracwritePath,exist_ok=True)
-
-  DefineScalarExpression('velocityY',"velocity[1]")
-
-  OpenDatabase(f'{folderPath}domain_0.*.xdmf database', 0)
-  print(f'Opened Database for {domain_folder}')
+def Centroid():
+    print(f'Opened Database for {domain_folder}')
 # Add Plot and Operators
-  AddPlot("Pseudocolor", "diffuse volume fraction 1", 1, 1)
-  AddOperator("Reflect", 1)
-  AddOperator("Slice", 1)
+    AddPlot("Pseudocolor", "diffuse volume fraction 1", 1, 1)
+    AddOperator("Reflect", 1)
+    AddOperator("Slice", 1)
 
 # Reflect Attributes
-  ReflectAtts = ReflectAttributes()
-  ReflectAtts.octant = ReflectAtts.PXPYPZ  # Reflection type
-  ReflectAtts.useXBoundary = 1
-  ReflectAtts.specifiedX = 0
-  ReflectAtts.useYBoundary = 0
-  ReflectAtts.useZBoundary = 1
-  ReflectAtts.specifiedZ = 0
-  ReflectAtts.reflections = (1, 1, 0, 0, 0, 0, 0, 0)
-  SetOperatorOptions(ReflectAtts, 0, 1)
+    ReflectAtts = ReflectAttributes()
+    ReflectAtts.octant = ReflectAtts.PXPYPZ  # Reflection type
+    ReflectAtts.useXBoundary = 1
+    ReflectAtts.specifiedX = 0
+    ReflectAtts.useYBoundary = 0
+    ReflectAtts.useZBoundary = 1
+    ReflectAtts.specifiedZ = 0
+    ReflectAtts.reflections = (1, 1, 0, 0, 0, 0, 0, 0)
+    SetOperatorOptions(ReflectAtts, 0, 1)
 
-# Slice Attributes
-  SliceAtts = SliceAttributes()
-  SliceAtts.originType = SliceAtts.Intercept
-  SliceAtts.originPoint = (0, 0, 0)
-  SliceAtts.normal = (0, 0, 1)
-  SliceAtts.axisType = SliceAtts.ZAxis
-  SliceAtts.project2d = 1
-  SetOperatorOptions(SliceAtts, 1, 1)
+  # Slice Attributes
+    SliceAtts = SliceAttributes()
+    SliceAtts.originType = SliceAtts.Intercept
+    SliceAtts.originPoint = (0, 0, 0)
+    SliceAtts.normal = (0, 0, 1)
+    SliceAtts.axisType = SliceAtts.ZAxis
+    SliceAtts.project2d = 1
+    SetOperatorOptions(SliceAtts, 1, 1)
 
 
-  DrawPlots()
-  nt=TimeSliderGetNStates()
-  f1=open(f'{folderPath}Centroid.txt',"w+")
+    DrawPlots()
+    nt=TimeSliderGetNStates()
+    f1=open(f'{folderPath}Centroid.txt',"w+")
 
-  for ts in range(0,nt):
-    TimeSliderSetState(ts)
-    time=Query("Time")
-    t=GetQueryOutputValue()
-    area=Query("Centroid")
-    a=GetQueryOutputValue()
-    f1.write("%15.12e %15.12e \n" % (t, a[1]))
-    f1.flush()
-    print(f'Centroid File Written, at time index: {ts}')
-  f1.close()
-  Clean()
+    for ts in range(0,nt):
+      TimeSliderSetState(ts)
+      time=Query("Time")
+      t=GetQueryOutputValue()
+      area=Query("Centroid")
+      a=GetQueryOutputValue()
+      f1.write("%15.12e %15.12e \n" % (t, a[1]))
+      f1.flush()
+      print(f'Centroid File Written, at time index: {ts}')
+    f1.close()
+    Clean()
 
-  ## Volume Loop ##
+def Volume():
+## Volume Loop ##
   # Add Plot and Operators
   print(f'Volume post processing for {domain_folder}')
   AddPlot("Pseudocolor", "diffuse volume fraction 1", 1, 1)
@@ -136,12 +119,13 @@ for domain_folder in domain_folders:
     a=GetQueryOutputValue()
     f1.write("%15.12e %15.12e \n" % (t, a))
     f1.flush()
-    print(f"File written at timestep: {ts}")
+    print(f"Volume File written at timestep: {ts}")
   f1.close()
   
   Clean()
 
-  ## Interface loop ##
+def Interface():
+## Interface loop ##
   # Add Plot and Operators
   print(f'Interface post processing loop for {domain_folder}')
   AddPlot("Pseudocolor", "diffuse volume fraction 1", 1, 1)
@@ -188,6 +172,8 @@ for domain_folder in domain_folders:
     SaveWindow()
   
   Clean()
+
+def Pressure():
   print(f'Centerline extraction for {domain_folder}')
   ## Pressure Loop ##
   AddPlot("Pseudocolor", "pressure", 1, 1)
@@ -211,7 +197,8 @@ for domain_folder in domain_folders:
   
   Clean()
 
-  ## Alpha Loop ##
+def Alpha():
+## Alpha Loop ##
   AddPlot("Pseudocolor", "diffuse volume fraction 1", 1, 1)
   DrawPlots()
   ActiveWindow1=2
@@ -227,14 +214,15 @@ for domain_folder in domain_folders:
       Data=GetPlotInformation()["Curve"]
       Alpha=Data[1::2]
       Position=Data[::2]
-      print(f'Writing Files to folder at timestep {ts}')
+      print(f'Writing  alpha along centerline files to folder at timestep {ts}')
       np.savetxt(f"{alphawritePath}/alpha{ts:04d}.txt", Alpha)
       if ts == 0:
         np.savetxt(f"{alphawritePath}/position{ts:04d}.txt", Position)
 
   Clean()
 
-  ## Velocity Loop ##
+def VelocityY():
+## Velocity Loop ##
   AddPlot("Pseudocolor", "velocityY", 1, 1)
   DrawPlots()
   ActiveWindow1=3
@@ -244,7 +232,7 @@ for domain_folder in domain_folders:
   for ts in range(0,nt):
       SetActiveWindow(ActiveWindow1)
       TimeSliderSetState(ts)
-      Lineout([0,4e-3,0],[0,12e-3,0],500)
+      Lineout([0,6e-3,0],[0,10e-3,0])
       SetActiveWindow(ActiveWindow2)
       SetActivePlots(0)
       Data=GetPlotInformation()["Curve"]
@@ -257,7 +245,8 @@ for domain_folder in domain_folders:
   
   Clean()
 
-  ## Pressure/Schlieren Imaging Loop ##
+def PressureSchlieren():
+## Pressure/Schlieren Imaging Loop ##
 
   # Add Plot and Operators
   AddPlot("Pseudocolor", "pressure", 1, 0)
@@ -370,4 +359,38 @@ for domain_folder in domain_folders:
     SaveWindow()
 
   Clean()
+
+
+
+for domain_folder in domain_folders:
+  DeleteAllPlots()
+  
+  
+  folderPath=f'/home/exy214/Documents/cavitation/data/jetting_ws_2025/runs/{domain_folder}/domain/'
+  alphawritePath=f'{folderPath}{alphaFolder}'
+  velocitywritePath=f'{folderPath}{velocityFolder}'
+  interfacewritePath=f'{folderPath}{interfaceFolder}'
+  pressurewritePath=f'{folderPath}{pressureFolder}'
+  volumefracwritePath=f'{folderPath}{volumefracFolder}'
+
+  os.makedirs(interfacewritePath,exist_ok=True)
+  os.makedirs(pressurewritePath,exist_ok=True)
+  os.makedirs(alphawritePath,exist_ok=True)
+  os.makedirs(velocitywritePath,exist_ok=True)
+  os.makedirs(volumefracwritePath,exist_ok=True)
+
+  OpenDatabase(f'{folderPath}domain_0.*.xdmf database', 0)
+  DefineScalarExpression('velocityY',"velocity[1]")
+  
+  if domain_folder != domain_folders[0]:
+    Centroid()
+    Volume()
+  else:
+    print(f'Skipping Centroid and Volume for {domain_folders[0]}')
+
+  Pressure()
+  Alpha()
+  VelocityY()
+  PressureSchlieren()
+
 exit()
