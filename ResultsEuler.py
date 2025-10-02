@@ -436,6 +436,7 @@ class simulationRun:
 
 ## Simulation Objects
 Simulations=[]*numSims #Empty simulations array
+MainSimulations=[]*4
 
 writePath='/home/exy214/Documents/cavitation/data/jetting_ws_2025/paper-images'
 #Running objects and appending to the arrays
@@ -446,4 +447,4 @@ Simulations.append(Shock1P0)
 # Plotting
 JettingImpactPlot(Simulations)
 ShockVolumePlot(Simulations)
-VolumePlot(Simulations)
+#VolumePlot(MainSimulations)
