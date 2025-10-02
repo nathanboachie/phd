@@ -127,7 +127,7 @@ class simulationRun:
         interface() --> Does all the manual labour regarding interface extraction
         Run() --> Calls class methods which are actually useful
     """
-    def __init__(self,filepath,pressure,tfinal,letter,name):
+    def __init__(self,filepath,writePath,pressure,startTime,tfinal,letter,name):
         #Initial Stuff
         self.filepath=filepath
         self.pressure=pressure
@@ -140,7 +140,7 @@ class simulationRun:
         self.Cl=1462 # Speed of sound in water (m/s)
         self.Rho_l=998 # Density of water (kg/m^3)
         self.P0=1e5 # Pressure of bubble at t=0
-        self.yMeasure=4e-3 # Position that the data begins measuring from 
+        self.yMeasure=6e-3 # Position that the data begins measuring from 
         
         # Volume Array
         self.VolumeArr=np.loadtxt(os.path.join(filepath, "Volume.txt"))
@@ -149,32 +149,37 @@ class simulationRun:
         self.PressureTemplate = os.path.join(filepath, "pressure", "pressure{:04d}.txt")
         self.NumRuns = len(self.VolumeArr)
         self.PressureList = [np.loadtxt(self.PressureTemplate.format(i)) for i in range(self.NumRuns)]
-        self.PressureMatrix=np.stack(self.PressureList,axis=1)
+        self.PressureMatrix=np.array(self.PressureList,dtype=object)
 
         #For Velocity Matrix
         self.VelocityTemplate = os.path.join(filepath, "velocity", "velocity{:04d}.txt")
         self.NumRuns = len(self.VolumeArr)
         self.VelocityList = [np.loadtxt(self.VelocityTemplate.format(i)) for i in range(self.NumRuns)]
-        self.VelocityMatrix=np.stack(self.VelocityList,axis=1)
+        self.VelocityMatrix=np.array(self.VelocityList,dtype=object)
 
         #For Diffuse Volume Fraction Matrix
         self.AlphaTemplate = os.path.join(filepath, "alpha", "alpha{:04d}.txt")
         self.NumRuns = len(self.VolumeArr)
         self.AlphaList = [np.loadtxt(self.AlphaTemplate.format(i)) for i in range(self.NumRuns)]
-        self.AlphaMatrix=np.stack(self.AlphaList,axis=1)
+        self.AlphaMatrix=np.array(self.AlphaList,dtype=object)
 
+        '''
         #For Interface Positional Matrix
 
         self.InterfaceTemplate = os.path.join(filepath, "interface", "Interface{:04d}.curve")
         self.NumRuns = len(self.VolumeArr)
         self.InterfaceList = [np.loadtxt(self.InterfaceTemplate.format(i)) for i in range(self.NumRuns)]
         self.InterfaceMatrix=np.stack(self.AlphaList,axis=1)
+        '''
 
         #For Position Matrix
-        self.PositionMatrix=np.loadtxt(os.path.join(filepath,"pressure/position0000.txt"))+self.yMeasure
+        self.PositionTemplate = os.path.join(filepath, "pressure", "pressureposition{:04d}.txt")
+        self.NumRuns = len(self.VolumeArr)
+        self.PositionList = [np.loadtxt(self.PositionTemplate.format(i)) for i in range(self.NumRuns)]
+        self.PositionMatrix=np.array(self.PositionList,dtype=object)
 
         # Time Matrix
-        self.startTime=4e-6
+        self.startTime=startTime
         self.tArray=np.linspace(self.startTime,tfinal,self.NumRuns)
         self.tArray=np.insert(self.tArray,0,0)
 
@@ -226,9 +231,9 @@ class simulationRun:
 
 
 
-        self.writePath='/home/exy214/Documents/cavitation/data/jetting_ws_2025/paper-images/' # Self explanatory
+        self.writePath=writePath # Self explanatory
         self.Speed,self.timeShift=timeShift(float(self.pressure),self.P0,self.gmaW,self.pinfW,self.rhoW,self.v1W,self.dx) # Time taken for shockwave to hit bubble
-    def Interface(self):
+    def Interface2(self):
         """
             Interface(self) --> Defines interfacial properties of position, velocity and volume fraction along centerline at most upstream and downstream points
         """
@@ -253,7 +258,36 @@ class simulationRun:
                 self.uInterfaceUpstream[i]=self.VelocityMatrix[:,i][I]
                 self.pInterfaceUpstream[i]=self.PressureMatrix[:,i][I]
                 self.aInterfaceUpstream[i]=self.AlphaMatrix[:,i][I]
-    
+    def Interface(self):
+        """
+            Interface(self) --> Defines interfacial properties of position, velocity and volume fraction along centerline at most upstream and downstream points
+        """
+        for i in range(self.NumRuns):
+            alphaI=self.AlphaList[i]
+            pressureI=self.PressureList[i]
+            velocityI=self.VelocityList[i]
+            positionI=self.PositionList[i]
+            Iarr=np.where(alphaI>0.9)[0]
+            if(len(Iarr) < 2):
+                self.tJetting=self.tArray[i] 
+                print(f'Jetting Achieved @ {self.tArray[i]}')
+                break
+            else:
+                YGasPosition=positionI[Iarr]
+                YMax=np.max(YGasPosition)
+                I=int(np.where(positionI==YMax)[0][0])
+                self.yInterfaceDownstream[i]=positionI[I]
+                self.uInterfaceDownstream[i]=velocityI[I]
+                self.pInterfaceDownstream[i]=pressureI[I]
+                self.aInterfaceDownstream[i]=alphaI[I]
+
+                YMin=np.min(YGasPosition)
+                I=int(np.where(positionI==YMin)[0][0])
+                self.yInterfaceUpstream[i]=positionI[I]
+                self.uInterfaceUpstream[i]=velocityI[I]
+                self.pInterfaceUpstream[i]=pressureI[I]
+                self.aInterfaceUpstream[i]=alphaI[I]
+ 
     def TrimArrays(self):
         """
             TrimArrays(self) --> Trim arrays based upon the number of zeros trailing the upstream velocity interface vector
@@ -265,9 +299,9 @@ class simulationRun:
         self.TrimaInterfaceUpstream=self.aInterfaceUpstream[0:len(self.TrimuInterfaceDownstream)]
         self.TrimaInterfaceDownstream=self.aInterfaceDownstream[0:len(self.TrimuInterfaceDownstream)]
         self.TrimtArray=self.tArray[0:len(self.TrimuInterfaceDownstream)]
-        self.TrimPressureMatrix=self.PressureMatrix[:,:len(self.TrimuInterfaceDownstream)]
-        self.TrimVelocityMatrix=self.VelocityMatrix[:,:len(self.TrimuInterfaceDownstream)]
-        self.TrimAlphaMatrix=self.AlphaMatrix[:,:len(self.TrimuInterfaceDownstream)]
+        self.TrimPressureMatrix = np.array([row[:len(self.TrimuInterfaceDownstream)] for row in self.PressureList])
+        self.TrimVelocityMatrix = np.array([row[:len(self.TrimuInterfaceDownstream)] for row in self.VelocityList])
+        self.TrimAlphaMatrix = np.array([row[:len(self.TrimuInterfaceDownstream)] for row in self.AlphaList])
 
     def MinVolumeTime(self):
         """
@@ -276,7 +310,7 @@ class simulationRun:
         MinVolumeIdx=np.argmin(self.VolumeArr[:,1])
         tMinVolume=self.tArray[MinVolumeIdx]
         return tMinVolume
-    
+    ''' 
     def BubbleCurvature(self):
         for i in range(self.NumRuns):
             Interface=self.InterfaceMatrix[:,i]
@@ -292,7 +326,7 @@ class simulationRun:
             # Bubble curvature
             bubbleCur=curvature(x,y)
             self.Curvature[i]=bubbleCur[0]
-
+    '''
     def PlotSpecs(self,xlabel,ylabel):
         """
             Defined Above
@@ -333,10 +367,12 @@ class simulationRun:
             VelocityContour() --> Plots the velocity contour for most upstream and downstream points overlayed with position plot
         """
         fig,ax = self.PlotSpecs(xlabel=r'$\tau$',ylabel=r'$\frac{(z-z_{0})}{R_{0}}$')
-        cntr = ax.contourf((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimVelocityMatrix,cmap='RdYlBu_r',levels=256)
+        print('Printing Position Matrix.squeeze() size')
+        print(self.PositionMatrix.squeeze().size)
+        #cntr = ax.contourf((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimVelocityMatrix,cmap='RdYlBu_r',levels=256)
         ax.plot((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.TrimyInterfaceDownstream-self.y0)/self.R0,'--',color='black')
         ax.plot((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.TrimyInterfaceUpstream-self.y0)/self.R0,'-',color='black')
-        cbar=fig.colorbar(cntr) 
+        #cbar=fig.colorbar(cntr) 
         if(self.tJetting!=0):
             ax.set_xlim(0,(self.tJetting-self.timeShift)/self.tRayleigh)
         else:
@@ -351,11 +387,11 @@ class simulationRun:
             PressureContour() --> Plots the pressure contour for the most upstream and downstream points overlayed with position plot
         """
         fig,ax = self.PlotSpecs(xlabel=r'$\tau$',ylabel=r'$\frac{(z-z_{0})}{R_{0}}$')
-        cntr = ax.contourf((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimPressureMatrix,cmap='RdYlBu_r',levels=256)
+        #cntr = ax.contourf((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.PositionMatrix.squeeze()-self.y0)/self.R0,self.TrimPressureMatrix,cmap='RdYlBu_r',levels=256)
         ax.plot((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.TrimyInterfaceDownstream-self.y0)/self.R0,'--',color='black')
         ax.plot((self.TrimtArray-self.timeShift)/self.tRayleigh,(self.TrimyInterfaceUpstream-self.y0)/self.R0,'-',color='black')
         ax.text(0.025,0.95, self.letter, transform=ax.transAxes, fontsize=12, va='top', ha='left')
-        cbar=fig.colorbar(cntr)
+        #cbar=fig.colorbar(cntr)
         if(self.tJetting!=0):
             ax.set_xlim(0,(self.tJetting-self.timeShift)/self.tRayleigh)
         else:
@@ -401,10 +437,11 @@ class simulationRun:
 ## Simulation Objects
 Simulations=[]*numSims #Empty simulations array
 
+writePath='/home/exy214/Documents/cavitation/data/jetting_ws_2025/paper-images'
 #Running objects and appending to the arrays
-PostProc=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/PostProc','100e6',7.5e-6,'(a)','PostProc')
-PostProc.Run()
-Simulations.append(PostProc)
+Shock1P0=simulationRun('/home/exy214/Documents/cavitation/data/jetting_ws_2025/Shock1P0',writePath,'1e6',4e-6,3e-5,'(a)','Shock1P0')
+Shock1P0.Run()
+Simulations.append(Shock1P0)
 
 # Plotting
 JettingImpactPlot(Simulations)
